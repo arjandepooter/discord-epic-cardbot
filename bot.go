@@ -47,7 +47,11 @@ func main() {
 		err   error
 		Token = flag.String("t", "", "Discord Authentication Token")
 	)
+
 	flag.Parse()
+	if len(*Token) == 0 {
+		*Token = os.Getenv("TOKEN")
+	}
 
 	cards = make(map[string]*epicapi.Card)
 
