@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/arjandepooter/discord-epic-cardbot/epicapi"
@@ -10,11 +11,15 @@ import (
 func updateCardDatabase() {
 	log.Info("Updating card database")
 
-	cards, err := epicapi.GetAllCards()
+	cardList, err := epicapi.GetAllCards()
 	if err != nil {
 		log.WithError(err).Error("Error when fetching cards")
 		return
 	}
 
-	log.Info(fmt.Sprintf("%d cards found", len(cards)))
+	for _, card := range cardList {
+		cards[strings.ToLower(card.Name)] = card
+	}
+
+	log.Info(fmt.Sprintf("%d cards found", len(cardList)))
 }

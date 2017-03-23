@@ -2,10 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
+	"strings"
 
 	log "github.com/Sirupsen/logrus"
+	"github.com/arjandepooter/discord-epic-cardbot/epicapi"
 	"github.com/bwmarrin/discordgo"
 	"github.com/robfig/cron"
 )
@@ -13,10 +16,30 @@ import (
 var (
 	discord  *discordgo.Session
 	schedule *cron.Cron
+	cards    map[string]*epicapi.Card
 )
 
 func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
-	log.Info(m.Author.Username)
+	msg := m.Message.Content
+	if strings.HasPrefix(msg, "!card ") {
+		cardName := strings.ToLower(strings.TrimSpace(msg[6:]))
+		log.Info(fmt.Sprintf("%s requested card `%s`", m.Author.Username, cardName))
+		card, exists := cards[cardName]
+
+		if exists {
+			log.Info(fmt.Sprintf("Card found: %s", card.Name))
+			embed := new(discordgo.MessageEmbed)
+			embed.Image = new(discordgo.MessageEmbedImage)
+			embed.Image.URL = epicapi.BaseURL + card.ImageSource
+
+			s.ChannelMessageSendEmbed(m.ChannelID, embed)
+		} else {
+			log.Info(fmt.Sprintf("Card not found"))
+			s.ChannelMessageSend(
+				m.ChannelID,
+				fmt.Sprintf("Sorry, can't find a card with the name '%s' :cry:", cardName))
+		}
+	}
 }
 
 func main() {
@@ -25,6 +48,8 @@ func main() {
 		Token = flag.String("t", "", "Discord Authentication Token")
 	)
 	flag.Parse()
+
+	cards = make(map[string]*epicapi.Card)
 
 	discord, err = discordgo.New(*Token)
 	if err != nil {
