@@ -71,6 +71,11 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	}
 }
 
+func init() {
+	cards = make(map[string]*epicapi.Card)
+	pattern = regexp.MustCompile(`\[{2}([a-zA-Z0-9\d\s]+)\]{2}`)
+}
+
 func main() {
 	var (
 		err   error
@@ -81,9 +86,6 @@ func main() {
 	if len(*Token) == 0 {
 		*Token = os.Getenv("TOKEN")
 	}
-
-	cards = make(map[string]*epicapi.Card)
-	pattern = regexp.MustCompile(`\[{2}([a-zA-Z0-9\d\s]+)\]{2}`)
 
 	discord, err = discordgo.New(*Token)
 	if err != nil {
