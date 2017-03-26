@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"regexp"
 	"strings"
 
 	log "github.com/Sirupsen/logrus"
@@ -17,22 +18,50 @@ var (
 	discord  *discordgo.Session
 	schedule *cron.Cron
 	cards    map[string]*epicapi.Card
+	pattern  *regexp.Regexp
 )
+
+func sendCard(card *epicapi.Card, channelID string) error {
+	embed := new(discordgo.MessageEmbed)
+	embed.Image = new(discordgo.MessageEmbedImage)
+	embed.Image.URL = epicapi.BaseURL + card.ImageSource
+
+	_, err := discord.ChannelMessageSendEmbed(channelID, embed)
+
+	return err
+}
 
 func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	msg := m.Message.Content
-	if strings.HasPrefix(msg, "!card ") {
+
+	if pattern.MatchString(msg) {
+		matches := pattern.FindAllStringSubmatch(msg, -1)
+
+		for _, match := range matches {
+			cardName := strings.ToLower(match[1])
+			card, exists := cards[cardName]
+
+			if exists {
+				log.Info(fmt.Sprintf("Card found: %s", card.Name))
+				err := sendCard(card, m.ChannelID)
+
+				if err != nil {
+					log.WithError(err).Error("Can't send card")
+				}
+			}
+		}
+	} else if strings.HasPrefix(msg, "!card ") {
 		cardName := strings.ToLower(strings.TrimSpace(msg[6:]))
 		log.Info(fmt.Sprintf("%s requested card `%s`", m.Author.Username, cardName))
 		card, exists := cards[cardName]
 
 		if exists {
 			log.Info(fmt.Sprintf("Card found: %s", card.Name))
-			embed := new(discordgo.MessageEmbed)
-			embed.Image = new(discordgo.MessageEmbedImage)
-			embed.Image.URL = epicapi.BaseURL + card.ImageSource
+			err := sendCard(card, m.ChannelID)
 
-			s.ChannelMessageSendEmbed(m.ChannelID, embed)
+			if err != nil {
+				log.WithError(err).Error("Can't send card")
+			}
 		} else {
 			log.Info(fmt.Sprintf("Card not found"))
 			s.ChannelMessageSend(
@@ -54,6 +83,7 @@ func main() {
 	}
 
 	cards = make(map[string]*epicapi.Card)
+	pattern = regexp.MustCompile(`\[{2}([a-zA-Z0-9\d\s]+)\]{2}`)
 
 	discord, err = discordgo.New(*Token)
 	if err != nil {
