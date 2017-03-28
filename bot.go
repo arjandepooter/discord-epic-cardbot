@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"os/signal"
@@ -11,6 +10,7 @@ import (
 	log "github.com/Sirupsen/logrus"
 	"github.com/arjandepooter/discord-epic-cardbot/epicapi"
 	"github.com/bwmarrin/discordgo"
+	"github.com/namsral/flag"
 	"github.com/robfig/cron"
 )
 
@@ -79,13 +79,10 @@ func init() {
 func main() {
 	var (
 		err   error
-		Token = flag.String("t", "", "Discord Authentication Token")
+		Token = flag.String("token", "", "Discord Authentication Token")
 	)
 
 	flag.Parse()
-	if len(*Token) == 0 {
-		*Token = os.Getenv("TOKEN")
-	}
 
 	discord, err = discordgo.New(*Token)
 	if err != nil {
