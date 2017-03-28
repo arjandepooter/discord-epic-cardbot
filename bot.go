@@ -9,6 +9,8 @@ import (
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/arjandepooter/discord-epic-cardbot/epicapi"
+	"github.com/blevesearch/bleve"
+	"github.com/blevesearch/bleve/mapping"
 	"github.com/bwmarrin/discordgo"
 	"github.com/namsral/flag"
 	"github.com/robfig/cron"
@@ -19,7 +21,51 @@ var (
 	schedule *cron.Cron
 	cards    map[string]*epicapi.Card
 	pattern  *regexp.Regexp
+	index    bleve.Index
 )
+
+func getIndex(path string) (bleve.Index, error) {
+	cardIndex, err := bleve.Open(path)
+
+	if err == bleve.ErrorIndexPathDoesNotExist {
+		indexMapping := getIndexMapping()
+		return bleve.New(path, indexMapping)
+	} else if err != nil {
+		return nil, err
+	}
+
+	return cardIndex, nil
+}
+
+func getIndexMapping() mapping.IndexMapping {
+	indexMapping := bleve.NewIndexMapping()
+	cardMapping := bleve.NewDocumentMapping()
+	nameFieldMapping := bleve.NewTextFieldMapping()
+	nameFieldMapping.Analyzer = "en"
+	cardMapping.AddFieldMappingsAt("name", nameFieldMapping)
+	indexMapping.DefaultMapping = cardMapping
+	indexMapping.AddDocumentMapping("card", cardMapping)
+
+	return indexMapping
+}
+
+func searchCard(cardName string) (*epicapi.Card, bool) {
+	query := bleve.NewMatchQuery(cardName)
+	query.SetField("name")
+	search := bleve.NewSearchRequest(query)
+	search.Size = 1
+	result, err := index.Search(search)
+	if err != nil {
+		log.WithError(err).Error("Can't search index")
+		return nil, false
+	}
+	if result.Total > 0 {
+		card, found := cards[result.Hits[0].ID]
+		return card, found
+	}
+
+	return nil, false
+}
 
 func sendCard(card *epicapi.Card, session *discordgo.Session, channelID string) error {
 	embed := new(discordgo.MessageEmbed)
@@ -39,9 +85,9 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		for _, match := range matches {
 			cardName := strings.ToLower(match[1])
-			card, exists := cards[cardName]
+			card, found := searchCard(cardName)
 
-			if exists {
+			if found {
 				log.Info(fmt.Sprintf("Card found: %s", card.Name))
 				err := sendCard(card, s, m.ChannelID)
 
@@ -53,9 +99,9 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 	} else if strings.HasPrefix(msg, "!card ") {
 		cardName := strings.ToLower(strings.TrimSpace(msg[6:]))
 		log.Info(fmt.Sprintf("%s requested card `%s`", m.Author.Username, cardName))
-		card, exists := cards[cardName]
+		card, found := searchCard(cardName)
 
-		if exists {
+		if found {
 			log.Info(fmt.Sprintf("Card found: %s", card.Name))
 			err := sendCard(card, s, m.ChannelID)
 
@@ -78,13 +124,14 @@ func init() {
 
 func main() {
 	var (
-		err   error
-		Token = flag.String("token", "", "Discord Authentication Token")
+		err       error
+		token     = flag.String("token", "", "Discord Authentication Token")
+		indexName = flag.String("index", "epiccardindex", "Bleve index location")
 	)
 
 	flag.Parse()
 
-	discord, err = discordgo.New(*Token)
+	discord, err = discordgo.New(*token)
 	if err != nil {
 		log.WithError(err).Fatal("Can't connect to Discord")
 		return
@@ -98,7 +145,9 @@ func main() {
 		return
 	}
 
+	index, err = getIndex(*indexName)
 	updateCardDatabase()
+
 	schedule = cron.New()
 	schedule.AddFunc("@daily", updateCardDatabase)
 	schedule.Start()

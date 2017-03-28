@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"strings"
 
 	log "github.com/Sirupsen/logrus"
 	"github.com/arjandepooter/discord-epic-cardbot/epicapi"
@@ -18,7 +17,8 @@ func updateCardDatabase() {
 	}
 
 	for _, card := range cardList {
-		cards[strings.ToLower(card.Name)] = card
+		cards[card.Code] = card
+		index.Index(card.Code, *card)
 	}
 
 	log.Info(fmt.Sprintf("%d cards found", len(cardList)))
