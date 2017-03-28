@@ -100,7 +100,7 @@ func main() {
 
 	updateCardDatabase()
 	schedule = cron.New()
-	schedule.AddFunc("@hourly", updateCardDatabase)
+	schedule.AddFunc("@daily", updateCardDatabase)
 	schedule.Start()
 
 	log.Info("Epic CardBot is ready and waiting for commands")
