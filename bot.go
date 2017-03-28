@@ -146,6 +146,10 @@ func main() {
 	}
 
 	index, err = getIndex(*indexName)
+	if err != nil {
+		log.WithError(err).Fatal("Error while opening index")
+		return
+	}
 	updateCardDatabase()
 
 	schedule = cron.New()
