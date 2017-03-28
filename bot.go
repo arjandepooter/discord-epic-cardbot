@@ -21,7 +21,7 @@ var (
 	pattern  *regexp.Regexp
 )
 
-func sendCard(card *epicapi.Card, channelID string) error {
+func sendCard(card *epicapi.Card, session *discordgo.Session, channelID string) error {
 	embed := new(discordgo.MessageEmbed)
 	embed.Image = new(discordgo.MessageEmbedImage)
 	embed.Image.URL = epicapi.BaseURL + card.ImageSource
@@ -43,7 +43,7 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 			if exists {
 				log.Info(fmt.Sprintf("Card found: %s", card.Name))
-				err := sendCard(card, m.ChannelID)
+				err := sendCard(card, s, m.ChannelID)
 
 				if err != nil {
 					log.WithError(err).Error("Can't send card")
@@ -57,7 +57,7 @@ func onMessage(s *discordgo.Session, m *discordgo.MessageCreate) {
 
 		if exists {
 			log.Info(fmt.Sprintf("Card found: %s", card.Name))
-			err := sendCard(card, m.ChannelID)
+			err := sendCard(card, s, m.ChannelID)
 
 			if err != nil {
 				log.WithError(err).Error("Can't send card")
